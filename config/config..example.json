@@ -1,0 +1,29 @@
+{
+    "mailConfig":{
+        "sender": "",
+        "recipients":[
+            "",
+            ""
+        ],
+        "copyRecipients":[
+            "",
+            ""
+        ],
+        "hiddenCopyRecipients":[
+            "",
+            "",
+            ""
+        ],
+        "mailSubject": "",
+        "mailBody": "",
+        "smtpRelay": ""
+    },
+    "apiConfig":{
+        "tenantId": "",
+        "clientId": "",
+        "clientSecretSecretName": ""
+    },
+    "secretsConfig":{
+        "secretVaultName": ""
+    }
+}
