@@ -1,23 +1,17 @@
+[CmdletBinding()]
+param (
+    [Parameter(Mandatory=$true)]
+    [ValidateScript({Test-Path $_ -PathType 'leaf'})]  
+    [string] 
+    $AssignmentsPath  
+)
+
 #Requires -Module Logging, GraphApiRequests, Microsoft.PowerShell.SecretManagement, Microsoft.PowerShell.SecretStore, Microsoft.Graph.Authentication, Microsoft.Graph.DeviceManagement
 Import-Module Logging, GraphApiRequests, Microsoft.PowerShell.SecretManagement, Microsoft.PowerShell.SecretStore, Microsoft.Graph.Authentication, Microsoft.Graph.DeviceManagement
-
-. $PSScriptRoot\Functions\Send-GraphEmail.ps1
-
-#region Functions
-function Get-IntunePolicies {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory=$true)]
-        [String]
-        $ParameterName
-    )
-}
-#endregion
 
 #region CommonVariables
 $WorkingDirectory = $PSScriptRoot 
 $CurrentDate = Get-Date
-$ReportName = "IntunePoliciesAssignments_($CurrentDate.toString('yyyy-MM-dd')).json"
 #endregion
 
 #region LoggingConfiguration
@@ -44,25 +38,29 @@ catch{
     break
 }
 
-Write-Log "Getting the Intune policies"
-try{
-    $Policies = Get-MgDeviceManagementDeviceConfiguration -ErrorAction "STOP" | Select-Object DisplayName, Id
-    Write-Log "Have found $($Policies.Count) policies"
+Write-Log 'Reading assignments'
+try {
+    $Assignments = Get-Content $AssignmentsPath -ErrorAction 'Stop' | ConvertFrom-Json
+    Write-Log "Assignments have been imported"
 }
-catch{
-    Write-Log "Unable to get the policies. $($_.Exception)" -level ERROR
+catch {
+    Write-Log "Unable to import assignments file" -Level ERROR
     break
 }
 
-$Assignments = @()
-foreach ($Policy in $Policies) {
-    $SelectionSplat = @(
-        @{L='PolicyDisplayName'; E={$Policy.DisplayName}},
-        @{L='PolicyID';E={$Policy.Id}},
-        'TargetGroupId',
-        'ExcludeGroup'
-    )    
-
-    $Assignments += Get-MgDeviceManagementDeviceConfigurationGroupAssignment -DeviceConfigurationId $Policy.Id | Select-Object $SelectionSplat
+foreach($Assignment in $Assignments){
+    $AssignmentSplat = @{
+        DeviceConfigurationId = $Assignment.PolicyID
+        TargetGroupId = $Assignment.TargetGroupId
+        ExcludeGroup = $Assignment.ExcludeGroup
+        ErroAction = "STOP"
+    }
+    try {
+        Write-Log "Creating assignment $($Assignment.PolicyDisplayName)"
+        New-MgDeviceManagementDeviceConfigurationGroupAssignment @AssignmentSplat
+    }
+    catch {
+        Write-Log "Unable to create assignment. Policy: $($Assignment.PolicyDisplayName) TargetGroup: $($Assignment.TargetGroupId). `n$($_.Exception)"
+    }
 }
-ConvertTo-Json $Assignments -Depth 3 | Out-File $ReportName 
+
